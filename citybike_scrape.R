@@ -22,5 +22,5 @@ trip_links <- links[1:27]
 # the last link is google drive. that might be tricky
 for(i in 1:length(trip_links)){
   time = substr(basename(trip_links[i]),1,6)
-  download.file(trip_links[i],paste0("~/Dropbox/qmss-4015/bikedata/",time,".zip"), method = "libcurl")
+  download.file(trip_links[i],paste0("bikedata/",time,".zip"), method = "libcurl")
 }
