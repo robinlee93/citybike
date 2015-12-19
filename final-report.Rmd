@@ -1,0 +1,123 @@
+---
+title: "City Bike Data Analysis"
+author: "Robin Lee"
+date: "December 18, 2015"
+output: pdf_document
+---
+
+## Introduction
+I am studying how weather (temperature and preciptation) affects the number of trips taken in City Bike.
+Riders might be less inclined to ride bicycles when there's rain or snow. Also, a sudden drop 
+
+Hypothesis - 
+Higher temperature is associated with more trips taken at a given day. 
+Rain or snow would reduce the number of trips
+
+IV
+temperature
+precipation (continuous/inch)
+membership type
+DV
+Daily total of trips
+Daily total time
+
+.  Explain what topic you are studying and what question in particular you are asking; this 
+require you to say what are your main independent and
+dependent variable(s).  Then state your 
+hypothesis about how the IV and DV should be related.
+No literature review is required at all.
+
+## Description of Data Set and Variables
+ I want to know how it was collected, how is it 
+representative (or not), etc.  Everyone must tell me what variables you are using and how they have been 
+coded and recoded.  
+
+I obtain my data from two sources. One source gives me city bike trip data. The other gives me daily weather data. 
+City bike trip data is obtained from City Bike System Data (https://www.citibikenyc.com/system-data). The website contains trip level data for each month from July 2013 to December 2015. I analyzed the data from Jan 2014 to December 2014. Because the dataset is trip-level, I then aggregate the number of trips, total time of trips by membership for each day. 
+
+a code that shows how I obtain the data
+citybike_scrape.R
+
+```{r}
+```
+
+
+this is a sample dataset for trip level data
+```{r}
+
+```
+
+how I aggregate it into daily level
+```{r}
+```
+
+this is a sample dataset for daily aggregate data
+```{r}
+
+```
+
+I obtain the weather data from WeatherUnderground.com (http://www.wunderground.com/history/airport/KNYC/2014/1/1/CustomHistory.html?dayend=31&monthend=12&yearend=2014&req_city=&req_state=&req_statename=&reqdb.zip=&reqdb.magic=&reqdb.wmo=&MR=1). I look at the weather data from Jan 1, 2014 to Dec 31, 2014. 
+
+The variables of the weather data are
+
+Then I combined the two data sources into one dataset
+
+variables list
+
+
+## Descriptive Statistics
+.  You should 
+have a table with the means, st.devs. etc. of all the variables you are 
+using.  With explanation and commentary.
+## Initial Models
+.  Tell me what model you are using and why (logit, probit, LPM, fixed effects, etc.).  Start 
+off with a simple model relating yo
+u main IV to your main DV.  Explain the relationship and why this 
+initial model is insufficient.  Maybe you need to make a scale/index of variables.  Maybe you need to 
+control for additional factors.  Maybe you want to include interaction terms. Maybe you 
+need to check 
+for serial correlation.  Etc.  Interpret everything correctly (ceteris paribus, on 
+the 
+right scale, etc.)
+
+My initial model is a OLS model. The Y variable is the number of trips. The X variables are daily average temperature and precipation. 
+
+```{r}
+
+
+```
+
+room for improvement 
+1. change of temperature compared to the previous day: a 60 degree weather may be considered warm if the previous day's temperature is 50, but would be considered cold to the rider if the previous day's temperature is 70. 
+
+2. membership type and interaction
+Weather change might affect short-term and annual rider differently. Annual riders are likely to be commuters and would be less affected by the change in weather. Short-term riders may be tourists or people who are trying out city bike. I would expect them to be affected by the change in weather more. 
+
+3. temperature (generalized)
+I suspect there be a quadratic function
+
+plot # of trips vs temperature
+
+
+4. number of stations available
+If city bike has expanded over the year, then I would expect it to be an exogenous factor not captured by the initial model. 
+
+5. weekday vs weekend
+
+## Final Models
+.  Tell me what models are your final best ones.  Why are they better than the initial ones 
+a
+nd what else do we need to know
+?
+Were there some intermediate steps to get to this final model. 
+Maybe have some diagnostics and checks.
+
+
+
+## Conclusion
+.  Tell me what you learned from doing the project.  Was your initial hypothesis supported or 
+not.  Why or why not?  Tell me what else you w
+ish you could have done.  Tell me how this work may 
+inform your thesis.  Etc
+
+Limitation - city bike station might increase over time. Changes in number of trips could be affected by 
