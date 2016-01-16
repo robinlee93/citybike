@@ -9,67 +9,125 @@ output: pdf_document
 I am studying how weather (temperature and preciptation) affects the number of trips taken in City Bike.
 Riders might be less inclined to ride bicycles when there's rain or snow. Also, a sudden drop 
 
-Hypothesis - 
-Higher temperature is associated with more trips taken at a given day. 
-Rain or snow would reduce the number of trips
+*Hypothesis* -  
+1.  Higher temperature is associated with more trips taken at a given day.   
+2.  Rain or snow would reduce the number of trips  
+3.  Short-term riders are more subject to the influence of weather.  
 
-IV
-temperature
-precipation (continuous/inch)
-membership type
-DV
-Daily total of trips
-Daily total time
+Indendent variables include mean temperature, precipitation, membership type and weekend indicator. 
 
-.  Explain what topic you are studying and what question in particular you are asking; this 
-require you to say what are your main independent and
-dependent variable(s).  Then state your 
-hypothesis about how the IV and DV should be related.
-No literature review is required at all.
+Dependent variable is Daily total of trips.
 
 ## Description of Data Set and Variables
- I want to know how it was collected, how is it 
-representative (or not), etc.  Everyone must tell me what variables you are using and how they have been 
-coded and recoded.  
 
 I obtain my data from two sources. One source gives me city bike trip data. The other gives me daily weather data. 
 City bike trip data is obtained from City Bike System Data (https://www.citibikenyc.com/system-data). The website contains trip level data for each month from July 2013 to December 2015. I analyzed the data from Jan 2014 to December 2014. Because the dataset is trip-level, I then aggregate the number of trips, total time of trips by membership for each day. 
 
-a code that shows how I obtain the data
-citybike_scrape.R
+Below is the code that shows how I obtain the city bike data.
 
-```{r}
+```{r, eval=FALSE}
+
+library(rvest)
+base.url <- html("https://www.citibikenyc.com/system-data")
+data <- base.url %>% 
+  html_nodes("#system-data li a") 
+
+# choose again, specify hyperlink
+links <- base.url %>%
+  html_nodes("#system-data li a") %>%
+  html_attr("href")
+
+# i want trip data
+trip_links <- links[1:27]
+
+# Step 2: Download zip files
+# the last link is google drive. that might be tricky
+for(i in 1:length(trip_links)){
+  time = substr(basename(trip_links[i]),1,6)
+  download.file(trip_links[i],paste0("bikedata/",time,".zip"), method = "libcurl")
+}
+
 ```
 
 
-this is a sample dataset for trip level data
+This is a sample dataset for trip level data
 ```{r}
+load("preview1.RData")
+triplevel
+```
+
+Below is the code showing how I aggregate it into daily level
+```{r, eval=FALSE}
+library(readr)
+library(dplyr)
+
+aggrdaily <- function(x){
+  x$date <- format(x$starttime, "%Y%m%d")
+  summary <- x %>% group_by(date, usertype) %>%
+    summarize(trips = n(), totaltime=sum(tripduration))
+  return(summary)
+}
+
+temp = list.files("bikedata/",pattern="*.csv")
+myfiles = lapply(paste("bikedata/",temp, sep=""), read_csv)
+
+for(i in 9:12){
+myfiles[[i]]$starttime <- as.POSIXct(myfiles[[i]]$starttime, format="%m/%d/%Y %H:%M:%S")
+}
+
+summary <- list()
+for(i in 1:12){
+  summary[[i]] <- aggrdaily(myfiles[[i]])
+}
+
+summary2014 <- data.frame()
+for(i in 1:12){
+  summary2014 <- rbind(summary2014,summary[[i]])
+}
 
 ```
 
-how I aggregate it into daily level
+This is a sample dataset for daily aggregate data. I will then combine this with weather data.
 ```{r}
-```
-
-this is a sample dataset for daily aggregate data
-```{r}
-
+load("summary2014.RData")
+head(summary2014)
 ```
 
 I obtain the weather data from WeatherUnderground.com (http://www.wunderground.com/history/airport/KNYC/2014/1/1/CustomHistory.html?dayend=31&monthend=12&yearend=2014&req_city=&req_state=&req_statename=&reqdb.zip=&reqdb.magic=&reqdb.wmo=&MR=1). I look at the weather data from Jan 1, 2014 to Dec 31, 2014. 
 
-The variables of the weather data are
+The variables of the weather data include date, temperature, dew point, humidty, sea level pressure, visibility, windspeed, precipitation, max gust speed, cloudcover and events. Variables other than date, precipitation, max gust speed, cloudcover and event all have three measurements - max, mean and min.
 
 Then I combined the two data sources into one dataset
 
-variables list
+```{r , include=FALSE}
+library(readr)
+library(dplyr)
+library(ggplot2)
 
+load("summary2014.RData")
+weather <- read_csv("2014weather.csv")
+diff = tail(weather$`Mean TemperatureF`, -1) - head(weather$`Mean TemperatureF`, -1)
+diff = c(2,diff)
+weather$tempdiff = diff
+
+colnames(weather)[1] <- "date"
+summary2014$date <- as.Date(summary2014$date, format="%Y%m%d")
+comb <- inner_join(summary2014, weather)
+
+```
+
+Here's the variables list of the combined dataset. The coding principle is quite simple.  
+```{r}
+names(comb)
+```
 
 ## Descriptive Statistics
-.  You should 
-have a table with the means, st.devs. etc. of all the variables you are 
-using.  With explanation and commentary.
-## Initial Models
+```{r}
+summary(comb)
+```
+
+
+## Initial Model
 .  Tell me what model you are using and why (logit, probit, LPM, fixed effects, etc.).  Start 
 off with a simple model relating yo
 u main IV to your main DV.  Explain the relationship and why this 
@@ -80,44 +138,117 @@ for serial correlation.  Etc.  Interpret everything correctly (ceteris paribus, 
 the 
 right scale, etc.)
 
-My initial model is a OLS model. The Y variable is the number of trips. The X variables are daily average temperature and precipation. 
+My initial model is a OLS model. The Y variable is the number of trips among annual subscribers. The X variable is daily average temperature. 
+
+A scatter plot supports my intuition.
+```{r}
+library(ggplot2)
+library(dplyr)
+load("combined2014.RData")
+load("summary2014.RData")
+
+total <- summary2014 %>% group_by(date) %>% summarise(trips=sum(trips), totaltime=sum(totaltime))
+
+comb_total <- inner_join(total, weather)
+
+ggplot(data=comb_total, aes(`Mean TemperatureF`, trips))+
+  geom_point()+
+  scale_y_continuous(limits=c(0,40000), expand=c(0,0))+
+  ggtitle("Number of trips per day in 2014")
+
+```
+The linear regression model is as follows
+```{r}
+
+m1 <- lm(data=comb_total, trips~`Mean TemperatureF`)
+
+summary(m1)
+```
+The initial model suggests that temperature explains the number of city bike trips well. The adjusted R-squared is 0.7. Net of other factors, a degree Farenheit increase in mean temperature leads to an increase of 482 trips per day. 
+
+## But there's room for improvement 
+###1. Membership type and interaction  
+Weather change might affect short-term and annual rider differently. Annual riders are likely to be commuters and would be less affected by the change in weather. Short-term riders may be tourists or people who are trying out city bike. I would expect them to be affected by the change in weather more. 
+
+I made scatterplot by usertype (short-term user or annual subscribers). The graph suggested the regression lines might have different slopes across the two graphs. It motivated me to include user type as well as its interaction term with the temperature into the model.
 
 ```{r}
 
+d <- ggplot(data=comb, aes(`Mean TemperatureF`, trips))+
+  geom_point(alpha=.5)+
+  scale_y_continuous(expand = c(0,5)) 
+
+d + facet_grid(usertype~., scales="free_y")
 
 ```
 
-room for improvement 
-1. change of temperature compared to the previous day: a 60 degree weather may be considered warm if the previous day's temperature is 50, but would be considered cold to the rider if the previous day's temperature is 70. 
 
-2. membership type and interaction
-Weather change might affect short-term and annual rider differently. Annual riders are likely to be commuters and would be less affected by the change in weather. Short-term riders may be tourists or people who are trying out city bike. I would expect them to be affected by the change in weather more. 
+### 2. Temperature is relative?
+To riders, change in temperature could be a relative term. A 60 degree weather may be considered warm if the previous day's temperature is 50, but would be considered cold to the rider if the previous day's temperature is 70. 
 
-3. temperature (generalized)
-I suspect there be a quadratic function
+```{r}
+m3 <-lm(data=comb, trips~`Mean TemperatureF`*usertype+tempdiff)
+summary(m3)
+```
+The regression result shows that adding temperature difference doesn't improve the model. This suggests that riders behavior doesn't depend on the change in temperature much. I am not including this variable to the model.
 
-plot # of trips vs temperature
+### 3. What if it rains or snows?
+Precipitation would also affect riders' behavior. I compared two models - one with precipitation level as continuous variable, the other with precipitation event as a boolean variable. Performance is similar, but I go with the one with boolean variable. The adjusted R sqaure is slightly better and interpretation is easier with  precipitation as a dummy variable.
+```{r}
+m4 <- lm(data=comb, trips~`Mean TemperatureF`*usertype+PrecipitationIn)
+summary(m4)
 
+#recode rain as a dummy 
+comb$precipitat <- comb$PrecipitationIn!=0
+m5 <- lm(data=comb, trips~`Mean TemperatureF`*usertype+precipitat)
+summary(m5)
 
-4. number of stations available
-If city bike has expanded over the year, then I would expect it to be an exogenous factor not captured by the initial model. 
-
-5. weekday vs weekend
-
-## Final Models
-.  Tell me what models are your final best ones.  Why are they better than the initial ones 
-a
-nd what else do we need to know
-?
-Were there some intermediate steps to get to this final model. 
-Maybe have some diagnostics and checks.
+```
 
 
+### 4. Weekday vs weekend?
+I think days of week would affect the riders' behaviors. Subscribers tend to be commuters and would not need to work during weekends. Short-term users acutally would behave on the opposite. 
 
-## Conclusion
-.  Tell me what you learned from doing the project.  Was your initial hypothesis supported or 
-not.  Why or why not?  Tell me what else you w
-ish you could have done.  Tell me how this work may 
-inform your thesis.  Etc
+I then constructed a dummy variable weekend. 
+I build the following models to validate my hypothesis. The result suggest that it's better to include both weekend and its interaction with user type. The model with interaction has a higher adjusted R sqaured at 0.92. 
+```{r}
+comb$weekday <- weekdays(comb$date)
+comb$weekend <- comb$weekday=="Saturday"|comb$weekday=="Sunday"
 
-Limitation - city bike station might increase over time. Changes in number of trips could be affected by 
+m6 <- lm(data=comb, trips~`Mean TemperatureF`*usertype+precipitat+weekend)
+summary(m6)
+
+m7 <- lm(data=comb, trips~`Mean TemperatureF`*usertype+precipitat+weekend+weekend:usertype)
+summary(m7)
+
+```
+
+### 5. Ever too hot to ride a bike?
+Before doing analysis, I was suspecting there be a quadratic function on temperature, because people don't want to ride in the hot days. 
+But the scatterplot doesn't suggest including temperature as a quadratic term. 
+
+I built a model with quadratic term to confirm my informed guess. The regression suggests that I should not include temperature as a quadratic term. 
+```{r}
+m8<- lm(data=comb_total, trips~poly(`Mean TemperatureF`,2))
+summary(m8)
+```
+
+## Final Models & Conclusion
+After going through these intermediate steps to improve my model, my final model is `m7 <- lm(data=comb, trips~`Mean TemperatureF`*usertype+precipitat+weekend+weekend:usertype)`. The model performs quite well. The adjusted R squared is 0.92.
+
+Under this model, my explanatory variables are mean temperature, usertype, precipitation (event/dummy), weekend (dummy) and interaction terms between usertype and weekend, as well as that between usertype and mean temperature.
+
+Based on the following diagnostic plots, there are some violation of the regression assumption at the extreme ends. But I think the violation is not serious. It is reasonable to use regression model.
+```{r}
+plot(m7)
+```
+
+My initial hypothesis was supported. The only expectation not met was the relative change in temperature. I guess New Yorkers check their weather app before they make a decision on using city bike. It's not driven by "Hmm.. it's colder than yesterday. I will not ride a bike."
+
+I found that higher temperature is associated with higher rides per day. Short-term users are more likely to use city bikes on weekends, but not annual subscribers. Rain or snow reduces the number rides per day. 
+
+But I didn't know how to determine whether subscirbers are more subject to weather change or customers. I wish I could have more time and use another model to detect that. I suspect I could accomplish this by scaling the trips in two groups. Also, I wanted to do somewith in spatial relationship, such as identifying popular routes, but didn't have enough skills to accomplish it. 
+
+There's one limitation with my analysis. City bike station might increase over time. Changes in number of trips could be affected by expansion of the city bike system. But that was not a poor decision not to consider this in the beginning. I later found that since the start of the operation in 2013, there's no expansion until late 2015. 
+
+Reflecting back to this project, there's quite little surprise to my finding. But I was able to learn more web-scraping with rvest package, get more familiar with dplyr, and practice plotting multiple plots with facet wrap in ggplot2. I also implemented some workflow ideas where I have 4 R scripts to scrape, clean, combine, and analyze my data respectively. Sadly, my analysis is not relevant to my thesis. 
